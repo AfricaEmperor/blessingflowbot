@@ -1,0 +1,17 @@
+{
+  "flow": {
+    "qr": "flow/flow_qr.png",
+    "audio": "flow/flow_whisper.mp3",
+    "scroll": "flow/flow_scroll.pdf"
+  },
+  "courage": {
+    "qr": "courage/qr_courage.png",
+    "audio": "courage/whisper_courage.mp3",
+    "scroll": "courage/scroll_courage.pdf"
+  },
+  "clarity": {
+    "qr": "clarity/qr_clarity.png",
+    "audio": "clarity/whisper_clarity.mp3",
+    "scroll": "clarity/scroll_clarity.pdf"
+  }
+}
