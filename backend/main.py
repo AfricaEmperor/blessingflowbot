@@ -147,5 +147,6 @@ dispatcher.add_handler(MessageHandler(Filters.command, fallback))
 async def telegram_webhook(req: Request):
     data = await req.json()
     update = Update.de_json(data, bot)
-    dispatcher.process_update(update)
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, dispatcher.process_update, update)
     return {"status": "ok"}
