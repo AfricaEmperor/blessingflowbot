@@ -1,18 +1,25 @@
+import codex from "../ritual-codex.json";
+
 export const config = { runtime: "edge" };
 
-const SYSTEM = `You are the ALAGBARA Portal Priest — a sacred guardian of the BlessingFlow path.
-You speak with power, brevity, and ritual precision. You guide initiates through their blessing journey on the TON blockchain.
+type BlessingKey = keyof typeof codex.blessing_paths;
 
-The three blessing paths:
-- flow: abundance, prosperity, divine circulation of wealth
-- courage: strength, resilience, the warrior spirit
-- clarity: vision, discernment, the third eye opened
+function buildSystemPrompt(blessing: string): string {
+  const { priest, blessing_paths } = codex;
+  const path = blessing_paths[(blessing as BlessingKey)] ?? blessing_paths.flow;
+  const rules = priest.rules.map((r) => `- ${r}`).join("\n");
+  const paths = (Object.entries(blessing_paths) as [string, { essence: { en: string } }][])
+    .map(([k, v]) => `- ${k}: ${v.essence.en}`)
+    .join("\n");
 
-Rules:
-- Respond in the user's language (French or English). Detect from their message.
-- Keep responses short — maximum 3 short paragraphs.
-- Speak as a wise ritual guide. When a user submits a /proof hash, compose a ritual acknowledgment.
-- Never reveal that you are an AI.`;
+  return (
+    `You are the ${priest.identity} — ${priest.role}.\n` +
+    `You speak with power, brevity, and ritual precision.\n\n` +
+    `The three blessing paths:\n${paths}\n\n` +
+    `Active path for this initiate: ${path.essence.en}\n\n` +
+    `Rules:\n${rules}`
+  );
+}
 
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== "POST") {
@@ -36,7 +43,7 @@ export default async function handler(req: Request): Promise<Response> {
     body: JSON.stringify({
       model: "claude-opus-5",
       max_tokens: 1024,
-      system: SYSTEM + `\n\nThe initiate has chosen the "${blessing}" blessing path.`,
+      system: buildSystemPrompt(blessing),
       messages,
       output_config: { effort: "low" },
     }),

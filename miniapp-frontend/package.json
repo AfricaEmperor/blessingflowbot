@@ -3,7 +3,8 @@
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "dev": "vite",
+    "dev": "cp ../backend/ritual-codex.json . && vite",
+    "prebuild": "cp ../backend/ritual-codex.json .",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
