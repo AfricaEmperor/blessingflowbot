@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Secrets and local state
+.env
+backend/.env
+backend/db/*.db
+backend/db/*.db-*
+backend/db/*.sqlite*
+
+# Node (miniapp-frontend)
+node_modules/
+dist/

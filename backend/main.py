@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from telegram import Update, Bot, constants
+from telegram import Update, Bot, ParseMode
 from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, CallbackContext
 import asyncio, os, json
 from dotenv import load_dotenv
@@ -70,7 +70,7 @@ def flow(update: Update, context: CallbackContext):
         save_exchange(uid, "/flow", text)
     except Exception:
         text = STATIC["flow_fallback"][lang]
-    update.message.reply_text(text, parse_mode=constants.ParseMode.MARKDOWN)
+    update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
 
 def help_cmd(update: Update, context: CallbackContext):
@@ -85,7 +85,7 @@ def proof(update: Update, context: CallbackContext):
     if not args:
         update.message.reply_text(
             "❗ Provide the transaction hash: `/proof <hash>`.",
-            parse_mode=constants.ParseMode.MARKDOWN,
+            parse_mode=ParseMode.MARKDOWN,
         )
         return
     proof_hash = args[0]
@@ -99,7 +99,7 @@ def proof(update: Update, context: CallbackContext):
     except Exception:
         ritual_msg = STATIC["proof_fallback"][lang].format(b=blessing)
 
-    update.message.reply_text(ritual_msg, parse_mode=constants.ParseMode.MARKDOWN)
+    update.message.reply_text(ritual_msg, parse_mode=ParseMode.MARKDOWN)
 
     from blessings.dispatcher import dispatch_blessing
     dispatch_blessing(bot, update.effective_chat.id, blessing, lang)
