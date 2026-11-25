@@ -116,8 +116,13 @@ def mission_cmd(update: Update, context: CallbackContext):
     if not args:
         update.message.reply_text(_mission_text(active_mission()))
         return
-    title = args[0]
-    objective = " ".join(args[1:]) if len(args) > 1 else title
+    if "|" in " ".join(args):
+        parts = " ".join(args).split("|", 1)
+        title = parts[0].strip()
+        objective = parts[1].strip() or title
+    else:
+        title = " ".join(args).strip()
+        objective = title
     try:
         created = create_mission(title, objective=objective)
         update.message.reply_text("Mission created.\n" + _mission_text(created))
