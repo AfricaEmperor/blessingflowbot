@@ -38,7 +38,7 @@ def main_mod(tmp_path, monkeypatch):
     import main  # noqa: WPS433
 
     monkeypatch.setattr(main, "LOG_PATH", str(tmp_path / "proofs.json"))
-    if hasattr(main, "flame"):
+    if main.flame is not None:
         main.flame.init()
     return main
 

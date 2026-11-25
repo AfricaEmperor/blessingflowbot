@@ -111,13 +111,12 @@ def test_registered_commands_include_originals(main_mod):
     assert {"start", "flow", "help", "proof", "fr", "en"} <= names
 
 
-def test_baseline_dispatch_failure_propagates(main_mod, mk, fake_priest):
-    """PRE-EXISTING DEFECT (baseline): backend/assets/ is not in the repo, so the
-    real dispatcher raises FileNotFoundError after the reply was already sent.
-    Flame Loop v0.1 changes this test to expect the failure to be contained."""
+def test_dispatch_failure_is_contained(main_mod, mk, fake_priest):
+    """backend/assets/ is not in the repo, so the real dispatcher raises
+    FileNotFoundError. Before Flame Loop v0.1 that escaped the handler after
+    the reply had been sent. It is now logged and recorded, not raised."""
     u = mk.update()
-    with pytest.raises(FileNotFoundError):
-        main_mod.proof(u, mk.context(["H3", "flow"]))
+    main_mod.proof(u, mk.context(["H3", "flow"]))  # must not raise
     assert u.message.reply_text.called
 
 

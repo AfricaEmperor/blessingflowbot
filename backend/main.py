@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from telegram import Update, Bot, ParseMode
 from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, CallbackContext
-import asyncio, os, json
+import asyncio, os, json, logging
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -13,6 +13,19 @@ dispatcher = Dispatcher(bot=bot, update_queue=asyncio.Queue(), use_context=True)
 
 from db.memory import init_db, get_history, save_exchange, get_lang, save_lang
 init_db()
+
+logger = logging.getLogger("blessingflow")
+
+try:
+    from flame import service as flame
+    from flame import render as flame_render
+    from flame.config import is_admin as flame_is_admin
+    from flame.errors import FlameError
+
+    flame.init()
+except Exception:  # mission tracking must never take the ritual flow down
+    logger.exception("Flame Loop unavailable; continuing without mission tracking")
+    flame = None
 
 LOG_PATH = os.path.join(os.path.dirname(__file__), "logs", "proofs.json")
 
@@ -38,8 +51,8 @@ STATIC = {
         "fr": "🌊 Bienvenue. Tapez /flow pour commencer votre rituel.",
     },
     "help": {
-        "en": "Commands: /flow, /proof <hash> [blessing], /fr, /en.",
-        "fr": "Commandes: /flow, /proof <hash> [bénédiction], /fr, /en.",
+        "en": "Commands: /flow, /proof <hash> [blessing], /status, /fr, /en.",
+        "fr": "Commandes: /flow, /proof <hash> [bénédiction], /status, /fr, /en.",
     },
     "flow_fallback": {
         "en": "Send TON and type `/proof <hash>` to receive your blessing.",
@@ -54,6 +67,39 @@ STATIC = {
         "fr": "❓ Commande inconnue. Utilisez /help.",
     },
 }
+
+
+def _flame_record(user_id, proof_hash, blessing, lang):
+    """Link the proof to the active mission. Never raises: the ritual comes first."""
+    if flame is None:
+        return None
+    try:
+        return flame.record_proof(user_id, proof_hash, blessing, lang)
+    except Exception:
+        logger.exception("could not record proof in the mission store")
+        return None
+
+
+def _flame_delivery(record, status, error=None):
+    if flame is None or not record or record.get("duplicate"):
+        return
+    try:
+        flame.set_delivery(record["proof_id"], status, error)
+    except Exception:
+        logger.exception("could not update delivery status")
+
+
+def _dispatch_and_track(chat_id, blessing, lang, record):
+    """Send the blessing assets; a failure is logged and recorded, not raised."""
+    try:
+        from blessings.dispatcher import dispatch_blessing
+
+        dispatch_blessing(bot, chat_id, blessing, lang)
+    except Exception as exc:
+        logger.exception("blessing dispatch failed")
+        _flame_delivery(record, "failed", f"{type(exc).__name__}: {exc}")
+    else:
+        _flame_delivery(record, "delivered")
 
 
 def start(update: Update, context: CallbackContext):
@@ -91,6 +137,7 @@ def proof(update: Update, context: CallbackContext):
     proof_hash = args[0]
     blessing = args[1] if len(args) > 1 and args[1] in BLESSING_MAP else "flow"
     log_proof(uid, proof_hash, blessing)
+    record = _flame_record(uid, proof_hash, blessing, lang)
 
     try:
         from ai.portal_priest import get_proof_blessing
@@ -101,8 +148,58 @@ def proof(update: Update, context: CallbackContext):
 
     update.message.reply_text(ritual_msg, parse_mode=ParseMode.MARKDOWN)
 
-    from blessings.dispatcher import dispatch_blessing
-    dispatch_blessing(bot, update.effective_chat.id, blessing, lang)
+    _dispatch_and_track(update.effective_chat.id, blessing, lang, record)
+
+
+def status_cmd(update: Update, context: CallbackContext):
+    uid = update.effective_user.id
+    lang = get_lang(uid)
+    if flame is None:
+        update.message.reply_text(STATIC["unknown"][lang])
+        return
+    try:
+        admin = flame_is_admin(uid)
+        snap = flame.snapshot()
+        mine = None
+        if snap["mission"] and not admin:
+            mine = flame.user_proof_count(uid, snap["mission"]["id"])
+        update.message.reply_text(flame_render.render_status(snap, lang, admin=admin, user_proofs=mine))
+    except Exception:
+        logger.exception("/status failed")
+        update.message.reply_text(STATIC["unknown"][lang])
+
+
+def outcome_cmd(update: Update, context: CallbackContext):
+    """Admin only: show or generate the outcome of a closed mission."""
+    uid = update.effective_user.id
+    lang = get_lang(uid)
+    if flame is None or not flame_is_admin(uid):
+        update.message.reply_text(STATIC["unknown"][lang])
+        return
+    try:
+        if context.args:
+            mission_id = context.args[0]
+        else:
+            pending = flame.snapshot()["closed_without_outcome"]
+            closed = [m["id"] for m in flame.list_missions() if m["status"] == "closed"]
+            mission_id = (pending or closed or [None])[-1]
+        if not mission_id:
+            update.message.reply_text("No closed mission yet. Close one with: python -m flame.cli close <id>")
+            return
+        mission = flame.get_mission(mission_id)
+        if mission and mission["status"] != "closed":
+            update.message.reply_text(
+                f"{mission_id} is {mission['status']}. Close it first: python -m flame.cli close {mission_id}"
+            )
+            return
+        out = flame.generate_outcome(mission_id)
+        nxt = flame.get_mission(out["next_mission_id"]) if out["next_mission_id"] else None
+        update.message.reply_text(flame_render.render_outcome(out, mission, nxt))
+    except FlameError as exc:
+        update.message.reply_text(str(exc))
+    except Exception:
+        logger.exception("/outcome failed")
+        update.message.reply_text(STATIC["unknown"][lang])
 
 
 def switch_fr(update: Update, context: CallbackContext):
@@ -137,6 +234,8 @@ dispatcher.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CommandHandler("flow", flow))
 dispatcher.add_handler(CommandHandler("help", help_cmd))
 dispatcher.add_handler(CommandHandler("proof", proof))
+dispatcher.add_handler(CommandHandler("status", status_cmd))
+dispatcher.add_handler(CommandHandler("outcome", outcome_cmd))
 dispatcher.add_handler(CommandHandler("fr", switch_fr))
 dispatcher.add_handler(CommandHandler("en", switch_en))
 dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
