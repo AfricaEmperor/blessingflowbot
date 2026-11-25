@@ -57,7 +57,7 @@ def create_mission(title, objective=None, channel="Telegram", status="active", p
             VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (mission_id,title,objective or title,channel,status,json.dumps([]), "Define deliverable and launch", parent_mission_id,_now(),_now())
         )
-        return get_mission(mission_id)
+    return get_mission(mission_id)
 
 
 def update_mission(mission_id, **fields):
