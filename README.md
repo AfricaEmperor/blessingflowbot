@@ -24,3 +24,12 @@
 - Use ngrok or Caddy for HTTPS local dev.
 - In Telegram, interact with `@YourBot`: `/start`, `/flow`, `/proof ABC123`.
 - Inspect `backend/logs/proofs.json` and `console/console_notebook.md`.
+
+## Flame Loop v0.1 (missions, evidence, outcomes)
+See `docs/flame-loop.md`. Quick checks:
+```bash
+cd backend
+pip install -r requirements-dev.txt   # Python 3.11
+python -m pytest -q
+python -m flame.cli --help
+```
