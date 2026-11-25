@@ -40,6 +40,7 @@ def init_db():
             updated_at TEXT NOT NULL
         )
     """)
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_mission ON missions(status) WHERE status='active'")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS proof_events (
             proof_id INTEGER PRIMARY KEY AUTOINCREMENT,
