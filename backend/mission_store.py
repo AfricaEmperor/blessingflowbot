@@ -4,6 +4,8 @@ Uses the existing BlessingFlowBot SQLite database. Proofs are self-reported and
 remain explicitly unverified until an independent chain verifier is implemented.
 """
 import json
+import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from db.memory import DB_PATH, init_db
 
@@ -12,12 +14,16 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+@contextmanager
 def _connect():
     init_db()
-    import sqlite3
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def active_mission():
